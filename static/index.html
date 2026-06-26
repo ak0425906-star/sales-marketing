@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeadLift — Marketing Automation Dashboard</title>
+    <meta name="description" content="LeadLift Marketing Automation System — AI-powered lead capture and outreach for Cosmasol.">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- ═══════════════════════════════════════════
+         SIDEBAR
+         ═══════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-icon">🚀</div>
+            <div>
+                <h1>LeadLift</h1>
+                <span class="version">v1.0 — Cosmasol Growth Engine</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Overview</div>
+            <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Dashboard</span>
+            </div>
+            <div class="nav-item" data-page="pipeline" onclick="navigateTo('pipeline')">
+                <span class="nav-icon">🔄</span>
+                <span class="nav-label">Pipeline</span>
+            </div>
+
+            <div class="nav-section-label">Manage</div>
+            <div class="nav-item" data-page="leads" onclick="navigateTo('leads')">
+                <span class="nav-icon">🏢</span>
+                <span class="nav-label">Lead Manager</span>
+                <span class="nav-badge" id="nav-badge-leads">0</span>
+            </div>
+            <div class="nav-item" data-page="contacts" onclick="navigateTo('contacts')">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">Contacts</span>
+                <span class="nav-badge" id="nav-badge-contacts">0</span>
+            </div>
+
+            <div class="nav-section-label">Outreach</div>
+            <div class="nav-item" data-page="outreach" onclick="navigateTo('outreach')">
+                <span class="nav-icon">✉️</span>
+                <span class="nav-label">Outreach Center</span>
+            </div>
+            <div class="nav-item" data-page="meetings" onclick="navigateTo('meetings')">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Meetings</span>
+                <span class="nav-badge" id="nav-badge-meetings">0</span>
+            </div>
+
+            <div class="nav-section-label">System</div>
+            <div class="nav-item" data-page="templates" onclick="navigateTo('templates')">
+                <span class="nav-icon">📝</span>
+                <span class="nav-label">Templates</span>
+            </div>
+            <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Settings</span>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="deadline-card">
+                <div class="deadline-label">⏰ Deadline</div>
+                <div class="deadline-days" id="deadline-days">—</div>
+                <div class="deadline-sub">days until July 20</div>
+            </div>
+        </div>
+    </aside>
+
+
+    <!-- ═══════════════════════════════════════════
+         MAIN CONTENT
+         ═══════════════════════════════════════════ -->
+    <main class="main-content">
+
+        <!-- ──────────────────────────────────────
+             DASHBOARD PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view active" id="page-dashboard">
+            <div class="page-header">
+                <div>
+                    <h2>📊 Command Center</h2>
+                    <p class="page-subtitle">Real-time overview of your marketing pipeline</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-ghost" onclick="refreshDashboard()">🔄 Refresh</button>
+                    <button class="btn btn-primary" onclick="navigateTo('outreach')">✉️ New Outreach</button>
+                </div>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="kpi-grid" id="kpi-grid">
+                <div class="kpi-card kpi-primary animate-in">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Total Agencies</span>
+                        <span class="kpi-icon">🏢</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-agencies">—</div>
+                    <div class="kpi-target">Target: 50 researched</div>
+                </div>
+                <div class="kpi-card kpi-info animate-in">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Contacts</span>
+                        <span class="kpi-icon">👤</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-contacts">—</div>
+                    <div class="kpi-target">Decision makers enriched</div>
+                </div>
+                <div class="kpi-card kpi-warning animate-in">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Outreach Sent</span>
+                        <span class="kpi-icon">✉️</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-outreach">—</div>
+                    <div class="kpi-target">Target: 30 contacts</div>
+                </div>
+                <div class="kpi-card kpi-success animate-in">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Response Rate</span>
+                        <span class="kpi-icon">💬</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-response">—</div>
+                    <div class="kpi-target">Target: ≥15%</div>
+                </div>
+                <div class="kpi-card kpi-secondary animate-in">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Meetings Booked</span>
+                        <span class="kpi-icon">📅</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-meetings">—</div>
+                    <div class="kpi-target">Target: 8 (min 4)</div>
+                </div>
+                <div class="kpi-card kpi-danger animate-in">
+                    <div class="kpi-header">
+                        <span class="kpi-label">Days Remaining</span>
+                        <span class="kpi-icon">⏰</span>
+                    </div>
+                    <div class="kpi-value" id="kpi-days">—</div>
+                    <div class="kpi-target">Until July 20 deadline</div>
+                </div>
+            </div>
+
+            <!-- Meeting Progress -->
+            <div class="card animate-in" style="margin-bottom: var(--space-xl);">
+                <div class="card-title">Meeting Progress Toward Goal</div>
+                <div style="display:flex; align-items:center; gap: var(--space-md); margin-bottom: var(--space-sm);">
+                    <span style="font-size: 0.82rem; color: var(--text-secondary);">
+                        <span id="progress-booked" style="font-weight: 700; color: var(--accent-success);">0</span> / 8 meetings booked
+                    </span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="progress-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="chart-grid">
+                <div class="card animate-in">
+                    <div class="card-title">Pipeline Funnel</div>
+                    <div class="funnel-container" id="funnel-chart"></div>
+                </div>
+                <div class="card animate-in">
+                    <div class="card-title">Recent Activity</div>
+                    <div class="activity-feed" id="activity-feed">
+                        <div class="empty-state">
+                            <div class="empty-icon">📭</div>
+                            <p>No activity yet. Start outreach to see updates here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ──────────────────────────────────────
+             PIPELINE PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view" id="page-pipeline">
+            <div class="page-header">
+                <div>
+                    <h2>🔄 Pipeline</h2>
+                    <p class="page-subtitle">Drag leads through your conversion funnel</p>
+                </div>
+            </div>
+            <div class="kanban-board" id="kanban-board"></div>
+        </div>
+
+
+        <!-- ──────────────────────────────────────
+             LEADS PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view" id="page-leads">
+            <div class="page-header">
+                <div>
+                    <h2>🏢 Lead Manager</h2>
+                    <p class="page-subtitle">Agency and clinic leads with scoring</p>
+                </div>
+                <div class="page-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="form-input" id="leads-search" placeholder="Search agencies..." oninput="searchLeads()">
+                    </div>
+                    <select class="form-select" id="leads-score-filter" onchange="searchLeads()" style="width:140px;">
+                        <option value="0">All Scores</option>
+                        <option value="9">9+ Score</option>
+                        <option value="8">8+ Score</option>
+                        <option value="7">7+ Score</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="openAddLeadModal()">+ Add Lead</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="data-table" id="leads-table">
+                    <thead>
+                        <tr>
+                            <th>Agency Name</th>
+                            <th>Location</th>
+                            <th>Services</th>
+                            <th>Score</th>
+                            <th>Stage</th>
+                            <th>Email</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leads-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+
+        <!-- ──────────────────────────────────────
+             CONTACTS PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view" id="page-contacts">
+            <div class="page-header">
+                <div>
+                    <h2>👤 Decision Makers</h2>
+                    <p class="page-subtitle">Key contacts at target agencies</p>
+                </div>
+                <div class="page-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="form-input" id="contacts-search" placeholder="Search contacts..." oninput="searchContacts()">
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddContactModal()">+ Add Contact</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="data-table" id="contacts-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Title</th>
+                            <th>Company</th>
+                            <th>Email</th>
+                            <th>LinkedIn</th>
+                            <th>Score</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contacts-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+
+        <!-- ──────────────────────────────────────
+             OUTREACH PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view" id="page-outreach">
+            <div class="page-header">
+                <div>
+                    <h2>✉️ Outreach Center</h2>
+                    <p class="page-subtitle">Compose, generate, and track outreach messages</p>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchOutreachTab('compose')">✍️ Compose</button>
+                <button class="tab" onclick="switchOutreachTab('log')">📋 Outreach Log</button>
+                <button class="tab" onclick="switchOutreachTab('followups')">🔔 Follow-Ups</button>
+            </div>
+
+            <!-- Compose Tab -->
+            <div id="outreach-tab-compose">
+                <div class="composer-container">
+                    <div class="card">
+                        <div class="card-title">Message Composer</div>
+                        <div class="form-group">
+                            <label class="form-label">Contact</label>
+                            <select class="form-select" id="compose-contact" onchange="onComposeContactChange()">
+                                <option value="">Select a contact...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Channel</label>
+                            <select class="form-select" id="compose-channel">
+                                <option value="email">📧 Email</option>
+                                <option value="linkedin">💼 LinkedIn</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Message Type</label>
+                            <select class="form-select" id="compose-type">
+                                <option value="first_email">First Email</option>
+                                <option value="follow_up">Follow-Up #1 (Day 7)</option>
+                                <option value="follow_up_2">Follow-Up #2 / Breakup (Day 14)</option>
+                                <option value="linkedin_connect">LinkedIn Connection Request</option>
+                                <option value="linkedin_followup">LinkedIn Follow-Up</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Custom Context (optional)</label>
+                            <textarea class="form-textarea" id="compose-context" rows="2" placeholder="Any extra context for AI generation..."></textarea>
+                        </div>
+                        <div style="display:flex; gap: var(--space-sm);">
+                            <button class="btn btn-primary" onclick="generateMessage()">🤖 Generate Message</button>
+                            <button class="btn" onclick="loadTemplate()">📝 Load Template</button>
+                        </div>
+                    </div>
+
+                    <div class="composer-preview" id="compose-preview">
+                        <div class="composer-preview-header">
+                            <span style="font-size:0.82rem; font-weight:600;">Preview</span>
+                            <div style="display:flex; gap:var(--space-sm);">
+                                <button class="btn btn-sm" onclick="copyMessage()">📋 Copy</button>
+                                <button class="btn btn-sm btn-success" onclick="sendMessage()">📤 Send</button>
+                            </div>
+                        </div>
+                        <div id="compose-subject" style="font-size: 0.82rem; font-weight: 600; color: var(--accent-primary); margin-bottom: var(--space-md); display: none;">
+                            <span style="color: var(--text-muted); font-weight: 500;">Subject: </span>
+                            <span id="compose-subject-text"></span>
+                        </div>
+                        <div class="composer-preview-body" id="compose-body">
+                            <div class="empty-state" style="padding: var(--space-xl);">
+                                <div class="empty-icon">✨</div>
+                                <h3>Ready to compose</h3>
+                                <p>Select a contact and click "Generate Message" to create a personalized outreach message.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outreach Log Tab -->
+            <div id="outreach-tab-log" style="display:none;">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Contact</th>
+                                <th>Company</th>
+                                <th>Channel</th>
+                                <th>Subject</th>
+                                <th>Sent</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="outreach-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Follow-Ups Tab -->
+            <div id="outreach-tab-followups" style="display:none;">
+                <div style="margin-bottom: var(--space-md);">
+                    <button class="btn btn-primary" onclick="processFollowUps()">🔄 Process Due Follow-Ups</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Contact</th>
+                                <th>Company</th>
+                                <th>Follow-Up #</th>
+                                <th>Scheduled Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="followups-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ──────────────────────────────────────
+             MEETINGS PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view" id="page-meetings">
+            <div class="page-header">
+                <div>
+                    <h2>📅 Meeting Tracker</h2>
+                    <p class="page-subtitle">Manage booked meetings and track outcomes</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-primary" onclick="openAddMeetingModal()">+ Book Meeting</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Contact</th>
+                            <th>Company</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Format</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="meetings-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+
+        <!-- ──────────────────────────────────────
+             TEMPLATES PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view" id="page-templates">
+            <div class="page-header">
+                <div>
+                    <h2>📝 Message Templates</h2>
+                    <p class="page-subtitle">Pre-built outreach templates for all channels</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-primary" onclick="openAddTemplateModal()">+ New Template</button>
+                </div>
+            </div>
+
+            <div class="tabs" id="template-tabs">
+                <button class="tab active" onclick="filterTemplates('all')">All</button>
+                <button class="tab" onclick="filterTemplates('email')">📧 Email</button>
+                <button class="tab" onclick="filterTemplates('linkedin')">💼 LinkedIn</button>
+            </div>
+
+            <div id="templates-list"></div>
+        </div>
+
+
+        <!-- ──────────────────────────────────────
+             SETTINGS PAGE
+             ────────────────────────────────────── -->
+        <div class="page-view" id="page-settings">
+            <div class="page-header">
+                <div>
+                    <h2>⚙️ Settings</h2>
+                    <p class="page-subtitle">Configure API keys, email, and personal details</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">👤 Your Details</div>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label class="form-label">Your Name</label>
+                        <input type="text" class="form-input" id="setting-your_name" placeholder="e.g. Akhil">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Your Title</label>
+                        <input type="text" class="form-input" id="setting-your_title" placeholder="e.g. Partnerships Manager">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Your Email</label>
+                        <input type="email" class="form-input" id="setting-your_email" placeholder="you@cosmasol.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Calendly Link</label>
+                        <input type="url" class="form-input" id="setting-calendly_link" placeholder="https://calendly.com/your-link">
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">🤖 AI Generation (Gemini)</div>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label class="form-label">Gemini API Key</label>
+                        <input type="password" class="form-input" id="setting-gemini_api_key" placeholder="Enter your Gemini API key">
+                        <div class="api-status" id="gemini-status">
+                            <span class="status-dot disconnected"></span>
+                            <span>Not configured — template mode active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">📧 Email Sending (SMTP)</div>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label class="form-label">SMTP Host</label>
+                        <input type="text" class="form-input" id="setting-smtp_host" placeholder="smtp.gmail.com" value="smtp.gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SMTP Port</label>
+                        <input type="text" class="form-input" id="setting-smtp_port" placeholder="587" value="587">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SMTP Username (Email)</label>
+                        <input type="email" class="form-input" id="setting-smtp_user" placeholder="you@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SMTP Password (App Password)</label>
+                        <input type="password" class="form-input" id="setting-smtp_password" placeholder="Your app password">
+                        <div class="api-status" id="smtp-status">
+                            <span class="status-dot disconnected"></span>
+                            <span>Not configured — manual email mode</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">From Email</label>
+                        <input type="email" class="form-input" id="setting-from_email" placeholder="you@cosmasol.com (defaults to SMTP user)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-section-title">📦 Data Management</div>
+                <div style="display:flex; gap: var(--space-sm); flex-wrap: wrap;">
+                    <button class="btn" onclick="exportData('agencies')">📥 Export Agencies CSV</button>
+                    <button class="btn" onclick="exportData('contacts')">📥 Export Contacts CSV</button>
+                    <button class="btn" onclick="exportData('outreach_log')">📥 Export Outreach CSV</button>
+                    <button class="btn" onclick="exportData('meetings')">📥 Export Meetings CSV</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     MODAL (Reusable)
+     ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalBackdrop(event)">
+    <div class="modal" id="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">Modal</h3>
+            <button class="btn btn-ghost btn-icon" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+    </div>
+</div>
+
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+
+<!-- App JavaScript -->
+<script src="/static/app.js"></script>
+
+</body>
+</html>

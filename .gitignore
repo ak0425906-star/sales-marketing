@@ -1,0 +1,33 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite database
+leadlift.db
+leadlift.db-journal
+leadlift.db-shm
+leadlift.db-wal
+
+# IDE / Editor configuration
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Settings & Secrets
+.env
+.env.local
+.env.*
