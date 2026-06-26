@@ -10,7 +10,11 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "leadlift.db"
+# Use /data for database file if mounted on cloud hosting (Render/Railway), fallback to local path
+if os.path.exists("/data") and os.access("/data", os.W_OK):
+    DB_PATH = Path("/data/leadlift.db")
+else:
+    DB_PATH = Path(__file__).parent / "leadlift.db"
 LOCAL_DATA_DIR = Path(__file__).parent / "data"
 LEADLIFT_DATA_DIR = LOCAL_DATA_DIR if LOCAL_DATA_DIR.exists() else Path(r"c:\Users\ak042\OneDrive\Desktop\LeadLift\data")
 
