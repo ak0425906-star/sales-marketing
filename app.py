@@ -723,11 +723,12 @@ if __name__ == "__main__":
     import uvicorn
     import sys
     import io
+    port = int(os.environ.get("PORT", 8000))
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     print("\n" + "=" * 60)
     print("  [*] LeadLift Marketing Automation System")
-    print("  [>] Dashboard: http://localhost:8000")
-    print("  [>] API Docs:  http://localhost:8000/docs")
+    print(f"  [>] Dashboard: http://localhost:{port}")
+    print(f"  [>] API Docs:  http://localhost:{port}/docs")
     print("=" * 60 + "\n")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)
