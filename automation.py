@@ -704,7 +704,11 @@ def enrich_contact_signalhire(contact_id: int) -> dict:
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
+            try:
+                res_data = json.loads(response.read().decode('utf-8'))
+            except json.decoder.JSONDecodeError:
+                return {"success": False, "error": "SignalHire API returned an invalid response (likely blocked by Cloudflare). Please use the test key 'sh_test_12345' to simulate this feature."}
+                
             candidate = res_data.get("candidate", {})
             update_fields = {}
             
@@ -797,7 +801,11 @@ def add_lead_to_instantly(contact_id: int, campaign_id: str = None) -> dict:
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
+            try:
+                res_data = json.loads(response.read().decode('utf-8'))
+            except json.decoder.JSONDecodeError:
+                return {"success": False, "error": "Instantly API returned an invalid response. Please use the test key 'in_test_54321' to simulate."}
+                
             lead_id = ""
             if isinstance(res_data, dict) and "lead_id" in res_data:
                 lead_id = res_data["lead_id"]
