@@ -645,182 +645,47 @@ def get_analytics_data() -> dict:
 # EXTERNAL INTEGRATIONS (SignalHire, Instantly, Webhooks)
 # ═══════════════════════════════════════════════════════════════
 
-def enrich_contact_signalhire(contact_id: int) -> dict:
-    """Enrich contact details via SignalHire API using email or LinkedIn URL."""
-    import urllib.request
-    import urllib.parse
+def send_instagram_dm(contact_id: int, message: str) -> dict:
+    """Simulate sending an Instagram DM (Mock implementation for now)."""
+    import time
     
-    api_key = get_setting("signalhire_api_key")
-    if not api_key:
-        return {"success": False, "error": "SignalHire API key not configured"}
+    username = get_setting("instagram_username")
+    password = get_setting("instagram_password")
+    
+    if not username or not password:
+        return {"success": False, "error": "Instagram credentials not configured in Settings."}
         
     conn = get_db()
     contact = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
-    conn.close()
     if not contact:
+        conn.close()
         return {"success": False, "error": "Contact not found"}
         
-    email = contact["email"]
-    linkedin = contact["linkedin_url"]
-    
-    # ── MOCK MODE FOR TEST KEYS ──
-    if api_key.startswith("sh_test"):
-        import time
-        time.sleep(1) # Simulate network delay
-        update_fields = {}
-        if not contact["facebook_url"]:
-            update_fields["facebook_url"] = f"https://facebook.com/{contact['name'].replace(' ', '').lower()}"
-        if not contact["x_url"]:
-            update_fields["x_url"] = f"https://x.com/{contact['name'].replace(' ', '').lower()}"
-        
-        if update_fields:
-            set_parts = ", ".join([f"{k} = ?" for k in update_fields.keys()])
-            vals = list(update_fields.values()) + [contact_id]
-            db = get_db()
-            db.execute(f"UPDATE contacts SET {set_parts} WHERE id = ?", vals)
-            db.commit()
-            db.close()
-        
-        log_activity("contact_enriched", "contacts", contact_id, f"SignalHire (MOCK) enriched fields: {list(update_fields.keys())}")
-        return {"success": True, "enriched": update_fields, "mock": True}
-    # ─────────────────────────────
-    
-    payload = {}
-    if email:
-        payload["email"] = email
-    elif linkedin:
-        payload["linkedinUrl"] = linkedin
-    else:
-        return {"success": False, "error": "No email or LinkedIn URL to query"}
-        
-    try:
-        req = urllib.request.Request(
-            "https://www.signalhire.com/api/v1/candidate/enrich",
-            data=json.dumps(payload).encode('utf-8'),
-            headers={
-                "Content-Type": "application/json",
-                "ApiKey": api_key
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            try:
-                res_data = json.loads(response.read().decode('utf-8'))
-            except json.decoder.JSONDecodeError:
-                return {"success": False, "error": "SignalHire API returned an invalid response (likely blocked by Cloudflare). Please use the test key 'sh_test_12345' to simulate this feature."}
-                
-            candidate = res_data.get("candidate", {})
-            update_fields = {}
-            
-            for profile in candidate.get("profiles", []):
-                network = profile.get("network", "").lower()
-                url = profile.get("url")
-                if network == "instagram" and not contact["instagram_url"]:
-                    update_fields["instagram_url"] = url
-                elif network == "facebook" and not contact["facebook_url"]:
-                    update_fields["facebook_url"] = url
-                elif (network == "twitter" or network == "x") and not contact["x_url"]:
-                    update_fields["x_url"] = url
-                    
-            if update_fields:
-                set_parts = ", ".join([f"{k} = ?" for k in update_fields.keys()])
-                vals = list(update_fields.values()) + [contact_id]
-                db = get_db()
-                db.execute(f"UPDATE contacts SET {set_parts} WHERE id = ?", vals)
-                db.commit()
-                db.close()
-                
-            log_activity("contact_enriched", "contacts", contact_id, f"SignalHire enriched fields: {list(update_fields.keys())}")
-            return {"success": True, "enriched": update_fields}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def add_lead_to_instantly(contact_id: int, campaign_id: str = None) -> dict:
-    """Push a contact into an Instantly email sequence campaign."""
-    import urllib.request
-    import urllib.parse
-    
-    api_key = get_setting("instantly_api_key")
-    if not api_key:
-        return {"success": False, "error": "Instantly API key not configured"}
-        
-    if not campaign_id:
-        campaign_id = get_setting("instantly_default_campaign_id")
-    if not campaign_id:
-        return {"success": False, "error": "Instantly Campaign ID not configured"}
-        
-    conn = get_db()
-    contact = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
+    contact = dict(contact)
     conn.close()
     
-    if not contact or not contact["email"]:
-        return {"success": False, "error": "Contact email missing"}
-
-    # ── MOCK MODE FOR TEST KEYS ──
-    if api_key.startswith("in_test"):
-        import time
-        time.sleep(1) # Simulate network delay
-        db = get_db()
-        db.execute("UPDATE contacts SET instantly_lead_id = ? WHERE id = ?", (f"mock_lead_{contact_id}", contact_id))
-        db.commit()
-        db.close()
-        log_activity("contact_pushed", "contacts", contact_id, f"Instantly (MOCK) added to campaign {campaign_id}")
-        return {"success": True, "instantly_lead_id": f"mock_lead_{contact_id}", "mock": True}
-    # ─────────────────────────────
+    ig_url = contact.get("instagram_url")
+    if not ig_url:
+        return {"success": False, "error": "Contact does not have an Instagram URL."}
         
-    names = contact["name"].split(" ", 1)
-    first_name = names[0]
-    last_name = names[1] if len(names) > 1 else ""
+    # Simulate network delay for IG API
+    time.sleep(1.5)
     
-    payload = {
-        "api_key": api_key,
-        "campaign_id": campaign_id,
-        "skip_if_in_workspace": True,
-        "leads": [
-            {
-                "email": contact["email"],
-                "first_name": first_name,
-                "last_name": last_name,
-                "company_name": contact["company"] or "",
-                "custom_variables": {
-                    "linkedin": contact["linkedin_url"] or "",
-                    "instagram": contact["instagram_url"] or "",
-                    "facebook": contact["facebook_url"] or "",
-                    "x": contact["x_url"] or ""
-                }
-            }
-        ]
-    }
+    # Log the outreach
+    db = get_db()
+    db.execute("""
+        INSERT INTO outreach_log (contact_id, contact_name, company_name, lead_type, 
+            channel, message_subject, message_body, status, sent_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    """, (
+        contact["id"], contact["name"], contact["company"], contact["lead_type"],
+        "instagram", "", message, "sent"
+    ))
+    db.commit()
+    db.close()
     
-    try:
-        req = urllib.request.Request(
-            "https://api.instantly.ai/v1/lead/add",
-            data=json.dumps(payload).encode('utf-8'),
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            try:
-                res_data = json.loads(response.read().decode('utf-8'))
-            except json.decoder.JSONDecodeError:
-                return {"success": False, "error": "Instantly API returned an invalid response. Please use the test key 'in_test_54321' to simulate."}
-                
-            lead_id = ""
-            if isinstance(res_data, dict) and "lead_id" in res_data:
-                lead_id = res_data["lead_id"]
-            elif isinstance(res_data, list) and len(res_data) > 0:
-                lead_id = res_data[0].get("id", "")
-                
-            db = get_db()
-            db.execute("UPDATE contacts SET instantly_lead_id = ? WHERE id = ?", (lead_id, contact_id))
-            db.commit()
-            db.close()
-            
-            log_activity("lead_added_instantly", "contacts", contact_id, f"Added to campaign {campaign_id}")
-            return {"success": True, "lead_id": lead_id, "details": res_data}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    log_activity("instagram_dm_sent", "contacts", contact_id, f"Sent IG DM to {contact['name']}")
+    return {"success": True, "message": "Instagram DM sent successfully (Mocked)"}
 
 
 def trigger_outbound_webhook(event_name: str, payload: dict) -> dict:

@@ -872,23 +872,7 @@ async def export_csv(table_name: str):
 # INTEGRATIONS ENDPOINTS
 # ═══════════════════════════════════════════════════════════════
 
-@app.post("/api/contacts/{contact_id}/enrich")
-async def enrich_contact(contact_id: int):
-    """Enrich contact via SignalHire."""
-    from automation import enrich_contact_signalhire
-    res = enrich_contact_signalhire(contact_id)
-    if not res.get("success"):
-        raise HTTPException(status_code=400, detail=res.get("error", "Failed to enrich"))
-    return res
 
-@app.post("/api/contacts/{contact_id}/push-instantly")
-async def push_lead_instantly(contact_id: int, campaign_id: str = Query(None)):
-    """Add contact to Instantly campaign."""
-    from automation import add_lead_to_instantly
-    res = add_lead_to_instantly(contact_id, campaign_id)
-    if not res.get("success"):
-        raise HTTPException(status_code=400, detail=res.get("error", "Failed to add to Instantly"))
-    return res
 
 @app.post("/api/contacts/{contact_id}/trigger-webhook")
 async def trigger_webhook(contact_id: int, event: str = Query("manual_trigger")):
@@ -913,7 +897,7 @@ async def trigger_webhook(contact_id: int, event: str = Query("manual_trigger"))
 
 @app.post("/api/ai/command")
 async def ai_command(request: Request):
-    """Conversational AI controller endpoint to parse and execute database actions."""
+    """Conversational AI controller endpoint using Gemini Function Calling."""
     if not hasattr(request.state, "user"):
         raise HTTPException(status_code=401, detail="Not authenticated")
         
@@ -928,11 +912,13 @@ async def ai_command(request: Request):
         
     try:
         from google import genai
+        from google.genai import types
+        
         client = genai.Client(api_key=api_key)
         
         system_instruction = """
-        You are the LeadLift AI Assistant. You help Cosmosol employees automate sales & marketing.
-        You have direct read-write access to an SQLite database.
+        You are Lunar, the LeadLift AI Assistant. You help Cosmosol employees automate sales & marketing.
+        You have direct read-write access to an SQLite database and the ability to trigger real software actions like sending emails or Instagram DMs.
         
         The database tables are:
         - agencies(id, name, website, city, state, services, notable_clients, contact_page_url, general_email, phone, partnership_score, pipeline_stage, notes, created_at, updated_at)
@@ -941,72 +927,150 @@ async def ai_command(request: Request):
         - outreach_log(id, contact_id, contact_name, company_name, lead_type, channel, message_subject, message_body, sent_date, status, follow_up_count, last_follow_up_date, opened_at, replied_at, notes, created_at)
         - meetings(id, contact_id, contact_name, company_name, lead_type, meeting_date, meeting_time, meeting_format, status, pre_meeting_brief, outcome, notes, created_at, updated_at)
         
-        Your task is to analyze the user's command and decide if it is a database query/action, a system command, or a normal question.
-        If it requires querying or modifying the database, output a single JSON block with:
-        {
-          "type": "sql",
-          "query": "SELECT ... or UPDATE ... or INSERT ...",
-          "params": [...],
-          "explanation": "Brief explanation of what this query does"
-        }
-        
-        If it is a general question (e.g. drafting an outreach pitch, greeting, general advice), output:
-        {
-          "type": "chat",
-          "response": "Your text response or draft here"
-        }
-        
-        Make sure you only output valid JSON matching one of the schemas above. Do not output markdown code blocks, just raw JSON.
+        When the user asks to perform an action (like sending an email, DM, or creating a contact) or queries data, ALWAYS use the appropriate tool/function call.
+        If it is just a general conversational question, you can reply directly.
         """
+        
+        sql_func = types.FunctionDeclaration(
+            name="execute_sql",
+            description="Executes a raw SQLite query (SELECT, INSERT, UPDATE) to answer questions about data or modify it.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "query": {"type": "STRING", "description": "The exact SQLite query to run. e.g. SELECT * FROM contacts"},
+                    "explanation": {"type": "STRING", "description": "A brief explanation of what the query is doing."}
+                },
+                "required": ["query", "explanation"]
+            }
+        )
+        
+        ig_func = types.FunctionDeclaration(
+            name="send_instagram_dm",
+            description="Sends an Instagram direct message to a specific contact.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "contact_id": {"type": "INTEGER", "description": "The integer ID of the contact from the database."},
+                    "message": {"type": "STRING", "description": "The message body to send via Instagram."}
+                },
+                "required": ["contact_id", "message"]
+            }
+        )
+        
+        email_func = types.FunctionDeclaration(
+            name="send_email",
+            description="Sends an email to a specific contact.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "contact_id": {"type": "INTEGER", "description": "The integer ID of the contact from the database."},
+                    "subject": {"type": "STRING", "description": "The email subject line."},
+                    "body": {"type": "STRING", "description": "The email body."}
+                },
+                "required": ["contact_id", "subject", "body"]
+            }
+        )
+        
+        contact_func = types.FunctionDeclaration(
+            name="create_contact",
+            description="Creates a new contact in the database.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "name": {"type": "STRING", "description": "Full name"},
+                    "company": {"type": "STRING", "description": "Company name"},
+                    "email": {"type": "STRING", "description": "Email address"}
+                },
+                "required": ["name", "company", "email"]
+            }
+        )
+        
+        tools = [types.Tool(function_declarations=[sql_func, ig_func, email_func, contact_func])]
         
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
-            config={
-                "system_instruction": system_instruction,
-                "response_mime_type": "application/json"
-            }
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                tools=tools
+            )
         )
         
-        res_json = json.loads(response.text.strip())
-        
-        if res_json.get("type") == "sql":
-            query = res_json.get("query", "")
-            params = res_json.get("params", [])
-            explanation = res_json.get("explanation", "")
+        if response.function_calls:
+            call = response.function_calls[0]
+            name = call.name
+            args = call.args
             
-            conn = get_db()
-            cursor = conn.cursor()
-            try:
-                forbidden = ["drop ", "truncate ", "alter table ", "delete from users"]
-                if any(f in query.lower() for f in forbidden):
-                    raise ValueError("Security violation: DDL or sensitive deletions are blocked.")
+            if name == "execute_sql":
+                query = args.get("query", "")
+                explanation = args.get("explanation", "")
+                conn = get_db()
+                cursor = conn.cursor()
+                try:
+                    forbidden = ["drop ", "truncate ", "alter table ", "delete from users"]
+                    if any(f in query.lower() for f in forbidden):
+                        raise ValueError("Security violation: DDL or sensitive deletions are blocked.")
+                        
+                    cursor.execute(query)
+                    if query.strip().lower().startswith("select"):
+                        rows = cursor.fetchall()
+                        data_res = [dict(row) for row in rows]
+                    else:
+                        conn.commit()
+                        data_res = {"rows_affected": cursor.rowcount}
+                        
+                    conn.close()
+                    log_activity("ai_sql_executed", "ai", details=f"Query: {query}")
+                    return {
+                        "type": "sql",
+                        "explanation": explanation,
+                        "query": query,
+                        "data": data_res
+                    }
+                except Exception as sql_err:
+                    conn.close()
+                    return {
+                        "type": "error",
+                        "error": f"Failed to execute AI-generated SQL query: {str(sql_err)}",
+                        "query": query
+                    }
                     
-                cursor.execute(query, params)
-                if query.strip().lower().startswith("select"):
-                    rows = cursor.fetchall()
-                    data_res = [dict(row) for row in rows]
+            elif name == "send_instagram_dm":
+                from automation import send_instagram_dm
+                res = send_instagram_dm(int(args.get("contact_id")), args.get("message"))
+                if res.get("success"):
+                    return {"type": "chat", "response": f"✅ {res['message']}"}
                 else:
-                    conn.commit()
-                    data_res = {"rows_affected": cursor.rowcount}
+                    return {"type": "error", "error": f"Failed to send IG DM: {res.get('error')}"}
                     
+            elif name == "send_email":
+                from automation import send_email
+                conn = get_db()
+                contact = conn.execute("SELECT email, name FROM contacts WHERE id = ?", (int(args.get("contact_id")),)).fetchone()
                 conn.close()
-                log_activity("ai_sql_executed", "ai", details=f"Query: {query}")
-                return {
-                    "type": "sql",
-                    "explanation": explanation,
-                    "query": query,
-                    "data": data_res
-                }
-            except Exception as sql_err:
+                if not contact:
+                    return {"type": "error", "error": "Contact not found"}
+                res = send_email(contact["email"], args.get("subject"), args.get("body"), int(args.get("contact_id")), contact["name"])
+                if res.get("success"):
+                    return {"type": "chat", "response": "✅ Email sent successfully!"}
+                else:
+                    return {"type": "error", "error": f"Failed to send email: {res.get('error')}"}
+                    
+            elif name == "create_contact":
+                conn = get_db()
+                cursor = conn.execute(
+                    "INSERT INTO contacts (name, company, email, confidence_score, pipeline_stage) VALUES (?, ?, ?, 5, 'new')",
+                    (args.get("name"), args.get("company"), args.get("email"))
+                )
+                conn.commit()
+                contact_id = cursor.lastrowid
                 conn.close()
-                return {
-                    "type": "error",
-                    "error": f"Failed to execute AI-generated SQL query: {str(sql_err)}",
-                    "query": query
-                }
+                log_activity("contact_created_by_ai", "contact", contact_id, f"Created: {args.get('name')}")
+                return {"type": "chat", "response": f"✅ Contact {args.get('name')} created successfully with ID {contact_id}!"}
                 
-        return res_json
+        # If no function was called, return standard chat response
+        text_response = response.text if response.text else "I executed the command but have no text response."
+        return {"type": "chat", "response": text_response}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Controller Error: {str(e)}")
