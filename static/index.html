@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LeadLift — Marketing Automation Dashboard</title>
     <meta name="description" content="LeadLift Marketing Automation System — AI-powered lead capture and outreach for Cosmasol.">
-    <link rel="stylesheet" href="/static/styles.css?v=2">
+    <link rel="stylesheet" href="/static/styles.css?v=3">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
@@ -103,83 +103,93 @@
                 </div>
             </div>
 
-            <!-- KPI Cards -->
-            <div class="kpi-grid" id="kpi-grid">
-                <div class="kpi-card kpi-primary animate-in">
+            <!-- Hero KPIs -->
+            <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: var(--space-lg);">
+                <div class="kpi-card kpi-primary animate-in" style="padding: var(--space-xl);">
                     <div class="kpi-header">
-                        <span class="kpi-label">Total Agencies</span>
-                        <span class="kpi-icon">🏢</span>
+                        <span class="kpi-label" style="font-size:0.85rem;">Total Agencies</span>
+                        <span class="kpi-icon" style="width:48px;height:48px;font-size:1.5rem;">🏢</span>
                     </div>
-                    <div class="kpi-value" id="kpi-agencies">—</div>
+                    <div class="kpi-value" id="kpi-agencies" style="font-size:2.8rem;">—</div>
                     <div class="kpi-target">Target: 50 researched</div>
                 </div>
-                <div class="kpi-card kpi-info animate-in">
+                <div class="kpi-card kpi-info animate-in" style="padding: var(--space-xl);">
                     <div class="kpi-header">
-                        <span class="kpi-label">Contacts</span>
-                        <span class="kpi-icon">👤</span>
+                        <span class="kpi-label" style="font-size:0.85rem;">Decision Makers</span>
+                        <span class="kpi-icon" style="width:48px;height:48px;font-size:1.5rem;">👤</span>
                     </div>
-                    <div class="kpi-value" id="kpi-contacts">—</div>
-                    <div class="kpi-target">Decision makers enriched</div>
+                    <div class="kpi-value" id="kpi-contacts" style="font-size:2.8rem;">—</div>
+                    <div class="kpi-target">Enriched Contacts</div>
                 </div>
-                <div class="kpi-card kpi-warning animate-in">
+                <div class="kpi-card kpi-secondary animate-in" style="padding: var(--space-xl);">
                     <div class="kpi-header">
-                        <span class="kpi-label">Outreach Sent</span>
-                        <span class="kpi-icon">✉️</span>
+                        <span class="kpi-label" style="font-size:0.85rem;">Meetings Booked</span>
+                        <span class="kpi-icon" style="width:48px;height:48px;font-size:1.5rem;">📅</span>
                     </div>
-                    <div class="kpi-value" id="kpi-outreach">—</div>
-                    <div class="kpi-target">Target: 30 contacts</div>
-                </div>
-                <div class="kpi-card kpi-success animate-in">
-                    <div class="kpi-header">
-                        <span class="kpi-label">Response Rate</span>
-                        <span class="kpi-icon">💬</span>
-                    </div>
-                    <div class="kpi-value" id="kpi-response">—</div>
-                    <div class="kpi-target">Target: ≥15%</div>
-                </div>
-                <div class="kpi-card kpi-secondary animate-in">
-                    <div class="kpi-header">
-                        <span class="kpi-label">Meetings Booked</span>
-                        <span class="kpi-icon">📅</span>
-                    </div>
-                    <div class="kpi-value" id="kpi-meetings">—</div>
+                    <div class="kpi-value" id="kpi-meetings" style="font-size:2.8rem;">—</div>
                     <div class="kpi-target">Target: 8 (min 4)</div>
                 </div>
-                <div class="kpi-card kpi-danger animate-in">
-                    <div class="kpi-header">
-                        <span class="kpi-label">Days Remaining</span>
-                        <span class="kpi-icon">⏰</span>
+            </div>
+
+            <!-- Two Column Layout -->
+            <div class="chart-grid" style="grid-template-columns: 2fr 1fr; gap: var(--space-lg);">
+                
+                <!-- Left Column: Pipeline & Progress -->
+                <div style="display:flex; flex-direction:column; gap:var(--space-lg);">
+                    <div class="card animate-in" style="flex:1;">
+                        <div class="card-title">Pipeline Funnel</div>
+                        <div class="funnel-container" id="funnel-chart" style="min-height:250px;"></div>
                     </div>
-                    <div class="kpi-value" id="kpi-days">—</div>
-                    <div class="kpi-target">Until July 20 deadline</div>
+                    
+                    <div class="card animate-in">
+                        <div class="card-title">Meeting Progress Toward Goal</div>
+                        <div style="display:flex; align-items:center; gap: var(--space-md); margin-bottom: var(--space-sm);">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                                <span id="progress-booked" style="font-weight: 800; color: var(--accent-success); font-size:1.1rem;">0</span> / 8 meetings booked
+                            </span>
+                        </div>
+                        <div class="progress-bar" style="height:12px; border-radius:12px;">
+                            <div class="progress-bar-fill" id="progress-fill" style="width: 0%; border-radius:12px; background:var(--gradient-success);"></div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Meeting Progress -->
-            <div class="card animate-in" style="margin-bottom: var(--space-xl);">
-                <div class="card-title">Meeting Progress Toward Goal</div>
-                <div style="display:flex; align-items:center; gap: var(--space-md); margin-bottom: var(--space-sm);">
-                    <span style="font-size: 0.82rem; color: var(--text-secondary);">
-                        <span id="progress-booked" style="font-weight: 700; color: var(--accent-success);">0</span> / 8 meetings booked
-                    </span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-bar-fill" id="progress-fill" style="width: 0%;"></div>
-                </div>
-            </div>
+                <!-- Right Column: Secondary Stats & Activity -->
+                <div style="display:flex; flex-direction:column; gap:var(--space-lg);">
+                    <div class="kpi-grid" style="grid-template-columns: 1fr; margin-bottom:0;">
+                        <div class="kpi-card kpi-warning animate-in">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Outreach Sent</span>
+                                <span class="kpi-icon">✉️</span>
+                            </div>
+                            <div class="kpi-value" id="kpi-outreach">—</div>
+                            <div class="kpi-target">Target: 30 contacts</div>
+                        </div>
+                        <div class="kpi-card kpi-success animate-in">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Response Rate</span>
+                                <span class="kpi-icon">💬</span>
+                            </div>
+                            <div class="kpi-value" id="kpi-response">—</div>
+                            <div class="kpi-target">Target: ≥15%</div>
+                        </div>
+                        <div class="kpi-card kpi-danger animate-in">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Days Remaining</span>
+                                <span class="kpi-icon">⏰</span>
+                            </div>
+                            <div class="kpi-value" id="kpi-days">—</div>
+                            <div class="kpi-target">Until July 20 deadline</div>
+                        </div>
+                    </div>
 
-            <!-- Charts Row -->
-            <div class="chart-grid">
-                <div class="card animate-in">
-                    <div class="card-title">Pipeline Funnel</div>
-                    <div class="funnel-container" id="funnel-chart"></div>
-                </div>
-                <div class="card animate-in">
-                    <div class="card-title">Recent Activity</div>
-                    <div class="activity-feed" id="activity-feed">
-                        <div class="empty-state">
-                            <div class="empty-icon">📭</div>
-                            <p>No activity yet. Start outreach to see updates here.</p>
+                    <div class="card animate-in" style="flex:1;">
+                        <div class="card-title">Recent Activity</div>
+                        <div class="activity-feed" id="activity-feed" style="max-height: 300px; overflow-y: auto;">
+                            <div class="empty-state">
+                                <div class="empty-icon">📭</div>
+                                <p>No activity yet.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -595,7 +605,7 @@
 <!-- AI Assistant Drawer -->
 <div class="ai-drawer-trigger" onclick="toggleAIDrawer()">
     <span class="trigger-icon">🤖</span>
-    <span class="trigger-text">LeadLift AI</span>
+    <span class="trigger-text">Lunar</span>
 </div>
 
 <div class="ai-drawer" id="ai-drawer">
@@ -603,7 +613,7 @@
         <div style="display:flex; align-items:center; gap:var(--space-sm);">
             <span>🤖</span>
             <div>
-                <h4 style="margin:0; font-size:0.9rem;">LeadLift AI</h4>
+                <h4 style="margin:0; font-size:0.9rem;">Lunar</h4>
                 <small style="color:var(--text-muted); font-size:0.68rem;">Cosmasol Active Assistant</small>
             </div>
         </div>
@@ -620,7 +630,7 @@
         <span onclick="runAISuggestion('Draft a cold email template')">✉️ Draft Sequence</span>
     </div>
     <form class="ai-drawer-input-area" onsubmit="submitAICommand(event)">
-        <input type="text" class="form-input" id="ai-prompt-input" placeholder="Ask LeadLift AI..." required>
+        <input type="text" class="form-input" id="ai-prompt-input" placeholder="Ask Lunar..." required>
         <button class="btn btn-primary btn-sm" type="submit" style="padding: 8px 14px;">Send</button>
     </form>
 </div>
@@ -630,7 +640,7 @@
 
 
 <!-- App JavaScript -->
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=3"></script>
 
 </body>
 </html>
