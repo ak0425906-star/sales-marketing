@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeadLift — Authenticate</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--bg-primary);
+            margin: 0;
+            padding: var(--space-md);
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: var(--space-2xl);
+            width: 100%;
+            max-width: 440px;
+            box-shadow: var(--shadow-xl);
+            position: relative;
+            z-index: 1;
+            animation: slideInUp 0.5s ease-out;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: var(--space-xl);
+        }
+
+        .login-logo {
+            width: 56px;
+            height: 56px;
+            background: var(--gradient-primary);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin: 0 auto var(--space-md);
+            box-shadow: var(--shadow-glow);
+            color: #fff;
+        }
+
+        .login-header h1 {
+            font-size: 1.7rem;
+            font-weight: 800;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+        }
+
+        .login-header p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin: var(--space-xs) 0 0;
+        }
+
+        .auth-tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.03);
+            padding: 4px;
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-lg);
+        }
+
+        .auth-tab {
+            flex: 1;
+            text-align: center;
+            padding: 8px 0;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .auth-tab.active {
+            background: #fff;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .auth-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: var(--accent-danger);
+            border-radius: var(--radius-sm);
+            padding: 10px;
+            font-size: 0.78rem;
+            margin-bottom: var(--space-md);
+            display: none;
+            text-align: center;
+        }
+
+        .auth-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: var(--accent-success);
+            border-radius: var(--radius-sm);
+            padding: 10px;
+            font-size: 0.78rem;
+            margin-bottom: var(--space-md);
+            display: none;
+            text-align: center;
+        }
+
+        .btn-auth {
+            width: 100%;
+            justify-content: center;
+            padding: 12px;
+            font-size: 0.9rem;
+            margin-top: var(--space-md);
+            border: none;
+        }
+
+        .form-info {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: var(--space-md);
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="login-header">
+        <div class="login-logo">🚀</div>
+        <h1>LeadLift</h1>
+        <p>Cosmasol Marketing & Sales Hub</p>
+    </div>
+
+    <div class="auth-tabs">
+        <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Sign In</div>
+        <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Create Account</div>
+    </div>
+
+    <div class="auth-error" id="auth-error"></div>
+    <div class="auth-success" id="auth-success"></div>
+
+    <!-- Login Form -->
+    <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
+        <div class="form-group">
+            <label class="form-label" for="login-email">Company Email</label>
+            <input class="form-input" type="email" id="login-email" placeholder="you@cosmosol.com" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="login-password">Password</label>
+            <input class="form-input" type="password" id="login-password" placeholder="••••••••" required>
+        </div>
+        <button class="btn btn-primary btn-auth" type="submit">Sign In</button>
+    </form>
+
+    <!-- Sign Up Form -->
+    <form class="auth-form" id="form-signup" onsubmit="handleSignup(event)">
+        <div class="form-group">
+            <label class="form-label" for="signup-email">Company Email</label>
+            <input class="form-input" type="email" id="signup-email" placeholder="you@cosmosol.com" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="signup-password">Password</label>
+            <input class="form-input" type="password" id="signup-password" placeholder="Min. 8 characters" minlength="8" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="signup-confirm">Confirm Password</label>
+            <input class="form-input" type="password" id="signup-confirm" placeholder="Repeat password" minlength="8" required>
+        </div>
+        <button class="btn btn-primary btn-auth" type="submit">Create Account</button>
+        <div class="form-info">
+            🔒 Restricted Access: Only accounts matching approved domains (e.g., @cosmosol.com) can be registered.
+        </div>
+    </form>
+</div>
+
+<script>
+    function switchTab(type) {
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+        document.getElementById('auth-error').style.display = 'none';
+        document.getElementById('auth-success').style.display = 'none';
+
+        if (type === 'login') {
+            document.getElementById('tab-login').classList.add('active');
+            document.getElementById('form-login').classList.add('active');
+        } else {
+            document.getElementById('tab-signup').classList.add('active');
+            document.getElementById('form-signup').classList.add('active');
+        }
+    }
+
+    async function handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const errDiv = document.getElementById('auth-error');
+        errDiv.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || 'Failed to authenticate');
+            }
+
+            localStorage.setItem('leadlift_token', data.token);
+            window.location.href = '/';
+        } catch (err) {
+            errDiv.textContent = err.message;
+            errDiv.style.display = 'block';
+        }
+    }
+
+    async function handleSignup(e) {
+        e.preventDefault();
+        const email = document.getElementById('signup-email').value;
+        const password = document.getElementById('signup-password').value;
+        const confirm = document.getElementById('signup-confirm').value;
+        const errDiv = document.getElementById('auth-error');
+        const successDiv = document.getElementById('auth-success');
+        
+        errDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+
+        if (password !== confirm) {
+            errDiv.textContent = "Passwords do not match.";
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || 'Failed to register account');
+            }
+
+            successDiv.textContent = "Account created successfully! Please sign in.";
+            successDiv.style.display = 'block';
+            switchTab('login');
+            document.getElementById('login-email').value = email;
+        } catch (err) {
+            errDiv.textContent = err.message;
+            errDiv.style.display = 'block';
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1126,7 +1126,9 @@ async function loadSettings() {
         const fields = [
             'your_name', 'your_title', 'your_email', 'calendly_link',
             'gemini_api_key', 'smtp_host', 'smtp_port', 'smtp_user',
-            'smtp_password', 'from_email'
+            'smtp_password', 'from_email',
+            'signalhire_api_key', 'instantly_api_key', 'instantly_default_campaign_id',
+            'outbound_webhook_url', 'allowed_domains'
         ];
 
         fields.forEach(key => {
@@ -1154,7 +1156,9 @@ async function saveSettings() {
     const fields = [
         'your_name', 'your_title', 'your_email', 'calendly_link',
         'gemini_api_key', 'smtp_host', 'smtp_port', 'smtp_user',
-        'smtp_password', 'from_email'
+        'smtp_password', 'from_email',
+        'signalhire_api_key', 'instantly_api_key', 'instantly_default_campaign_id',
+        'outbound_webhook_url', 'allowed_domains'
     ];
 
     const data = {};
@@ -1178,6 +1182,124 @@ function exportData(tableName) {
 
 
 // ═══════════════════════════════════════════════════════════════
+// AI ASSISTANT DRAWER CONTROLLER
+// ═══════════════════════════════════════════════════════════════
+
+function toggleAIDrawer() {
+    document.getElementById('ai-drawer').classList.toggle('active');
+}
+
+function runAISuggestion(text) {
+    document.getElementById('ai-prompt-input').value = text;
+    document.getElementById('ai-prompt-input').focus();
+}
+
+async function submitAICommand(e) {
+    if (e) e.preventDefault();
+    const input = document.getElementById('ai-prompt-input');
+    const prompt = input.value.trim();
+    if (!prompt) return;
+    
+    input.value = '';
+    appendAIMessage(prompt, 'user');
+    
+    const loadingId = appendAIMessage('Thinking...', 'assistant loading');
+    
+    try {
+        const res = await fetch('/api/ai/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (localStorage.getItem('leadlift_token') || '')
+            },
+            body: JSON.stringify({ prompt })
+        });
+        
+        const data = await res.json();
+        removeLoadingMessage(loadingId);
+        
+        if (!res.ok) {
+            appendAIMessage('Error: ' + (data.detail || 'Failed to process AI command'), 'assistant error');
+            return;
+        }
+        
+        if (data.type === 'chat') {
+            appendAIMessage(data.response, 'assistant');
+        } else if (data.type === 'sql') {
+            let html = `<div class="ai-message-explanation">${esc(data.explanation)}</div>`;
+            html += `<pre class="ai-message-sql">${esc(data.query)}</pre>`;
+            
+            if (Array.isArray(data.data) && data.data.length > 0) {
+                // Render table
+                html += `<div style="overflow-x:auto; margin-top:8px; border:1px solid var(--border-default); border-radius:var(--radius-sm);">`;
+                html += `<table style="width:100%; border-collapse:collapse; font-size:0.72rem; text-align:left;">`;
+                // Headers
+                const headers = Object.keys(data.data[0]);
+                html += `<tr style="background:rgba(0,0,0,0.02); border-bottom:1px solid var(--border-default);">`;
+                headers.forEach(h => {
+                    html += `<th style="padding:6px; font-weight:600;">${esc(h)}</th>`;
+                });
+                html += `</tr>`;
+                // Rows
+                data.data.forEach(row => {
+                    html += `<tr style="border-bottom:1px solid var(--border-default);">`;
+                    headers.forEach(h => {
+                        html += `<td style="padding:6px; color:var(--text-secondary);">${esc(row[h])}</td>`;
+                    });
+                    html += `</tr>`;
+                });
+                html += `</table></div>`;
+            } else if (typeof data.data === 'object') {
+                html += `<div style="font-size:0.75rem; color:var(--text-secondary); margin-top:6px;">Result: ${JSON.stringify(data.data)}</div>`;
+            } else {
+                html += `<div style="font-size:0.75rem; color:var(--text-secondary); margin-top:6px;">No rows returned.</div>`;
+            }
+            appendAIMessage(html, 'assistant raw-html');
+        } else if (data.type === 'error') {
+            let html = `<div style="color:var(--accent-danger); font-weight:600;">Execution Failed</div>`;
+            html += `<div style="font-size:0.75rem; color:var(--text-secondary); margin-top:4px;">${esc(data.error)}</div>`;
+            if (data.query) {
+                html += `<pre class="ai-message-sql">${esc(data.query)}</pre>`;
+            }
+            appendAIMessage(html, 'assistant raw-html');
+        } else {
+            appendAIMessage(JSON.stringify(data), 'assistant');
+        }
+    } catch (err) {
+        removeLoadingMessage(loadingId);
+        appendAIMessage('Request failed: ' + err.message, 'assistant error');
+    }
+}
+
+function appendAIMessage(content, type) {
+    const chat = document.getElementById('ai-chat-messages');
+    const msg = document.createElement('div');
+    const id = 'msg_' + Math.random().toString(36).substring(2, 11);
+    msg.id = id;
+    
+    if (type === 'assistant loading') {
+        msg.className = 'ai-message assistant';
+        msg.innerHTML = '<span style="animation:pulse 1s infinite;">Thinking...</span>';
+    } else if (type === 'assistant raw-html') {
+        msg.className = 'ai-message assistant';
+        msg.innerHTML = content;
+    } else {
+        msg.className = 'ai-message ' + type;
+        msg.textContent = content;
+    }
+    
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+    return id;
+}
+
+function removeLoadingMessage(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════
 
@@ -1189,6 +1311,6 @@ function setText(id, text) {
 function esc(str) {
     if (!str) return '';
     const div = document.createElement('div');
-    div.textContent = str;
+    div.textContent = String(str);
     return div.innerHTML;
 }

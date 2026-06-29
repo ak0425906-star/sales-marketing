@@ -639,3 +639,171 @@ def get_analytics_data() -> dict:
         "funnel": funnel,
         "score_distribution": [dict(row) for row in score_dist],
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# EXTERNAL INTEGRATIONS (SignalHire, Instantly, Webhooks)
+# ═══════════════════════════════════════════════════════════════
+
+def enrich_contact_signalhire(contact_id: int) -> dict:
+    """Enrich contact details via SignalHire API using email or LinkedIn URL."""
+    import urllib.request
+    import urllib.parse
+    
+    api_key = get_setting("signalhire_api_key")
+    if not api_key:
+        return {"success": False, "error": "SignalHire API key not configured"}
+        
+    conn = get_db()
+    contact = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
+    conn.close()
+    if not contact:
+        return {"success": False, "error": "Contact not found"}
+        
+    email = contact["email"]
+    linkedin = contact["linkedin_url"]
+    
+    payload = {}
+    if email:
+        payload["email"] = email
+    elif linkedin:
+        payload["linkedinUrl"] = linkedin
+    else:
+        return {"success": False, "error": "No email or LinkedIn URL to query"}
+        
+    try:
+        req = urllib.request.Request(
+            "https://www.signalhire.com/api/v1/candidate/enrich",
+            data=json.dumps(payload).encode('utf-8'),
+            headers={
+                "Content-Type": "application/json",
+                "ApiKey": api_key
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            candidate = res_data.get("candidate", {})
+            update_fields = {}
+            
+            for profile in candidate.get("profiles", []):
+                network = profile.get("network", "").lower()
+                url = profile.get("url")
+                if network == "instagram" and not contact["instagram_url"]:
+                    update_fields["instagram_url"] = url
+                elif network == "facebook" and not contact["facebook_url"]:
+                    update_fields["facebook_url"] = url
+                elif (network == "twitter" or network == "x") and not contact["x_url"]:
+                    update_fields["x_url"] = url
+                    
+            if update_fields:
+                set_parts = ", ".join([f"{k} = ?" for k in update_fields.keys()])
+                vals = list(update_fields.values()) + [contact_id]
+                db = get_db()
+                db.execute(f"UPDATE contacts SET {set_parts} WHERE id = ?", vals)
+                db.commit()
+                db.close()
+                
+            log_activity("contact_enriched", "contacts", contact_id, f"SignalHire enriched fields: {list(update_fields.keys())}")
+            return {"success": True, "enriched": update_fields}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def add_lead_to_instantly(contact_id: int, campaign_id: str = None) -> dict:
+    """Push a contact into an Instantly email sequence campaign."""
+    import urllib.request
+    import urllib.parse
+    
+    api_key = get_setting("instantly_api_key")
+    if not api_key:
+        return {"success": False, "error": "Instantly API key not configured"}
+        
+    if not campaign_id:
+        campaign_id = get_setting("instantly_default_campaign_id")
+    if not campaign_id:
+        return {"success": False, "error": "Instantly Campaign ID not configured"}
+        
+    conn = get_db()
+    contact = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
+    conn.close()
+    
+    if not contact or not contact["email"]:
+        return {"success": False, "error": "Contact email missing"}
+        
+    names = contact["name"].split(" ", 1)
+    first_name = names[0]
+    last_name = names[1] if len(names) > 1 else ""
+    
+    payload = {
+        "api_key": api_key,
+        "campaign_id": campaign_id,
+        "skip_if_in_workspace": True,
+        "leads": [
+            {
+                "email": contact["email"],
+                "first_name": first_name,
+                "last_name": last_name,
+                "company_name": contact["company"] or "",
+                "custom_variables": {
+                    "linkedin": contact["linkedin_url"] or "",
+                    "instagram": contact["instagram_url"] or "",
+                    "facebook": contact["facebook_url"] or "",
+                    "x": contact["x_url"] or ""
+                }
+            }
+        ]
+    }
+    
+    try:
+        req = urllib.request.Request(
+            "https://api.instantly.ai/v1/lead/add",
+            data=json.dumps(payload).encode('utf-8'),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            lead_id = ""
+            if isinstance(res_data, dict) and "lead_id" in res_data:
+                lead_id = res_data["lead_id"]
+            elif isinstance(res_data, list) and len(res_data) > 0:
+                lead_id = res_data[0].get("id", "")
+                
+            db = get_db()
+            db.execute("UPDATE contacts SET instantly_lead_id = ? WHERE id = ?", (lead_id, contact_id))
+            db.commit()
+            db.close()
+            
+            log_activity("lead_added_instantly", "contacts", contact_id, f"Added to campaign {campaign_id}")
+            return {"success": True, "lead_id": lead_id, "details": res_data}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def trigger_outbound_webhook(event_name: str, payload: dict) -> dict:
+    """Dispatch a webhook notification to Zapier / Make.com."""
+    import urllib.request
+    import urllib.parse
+    
+    webhook_url = get_setting("outbound_webhook_url")
+    if not webhook_url:
+        return {"success": False, "error": "Webhook URL not configured"}
+        
+    data = {
+        "event": event_name,
+        "timestamp": datetime.now().isoformat(),
+        "data": payload
+    }
+    
+    try:
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(data).encode('utf-8'),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return {"success": True, "status": response.status}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

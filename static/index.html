@@ -503,6 +503,32 @@
             </div>
 
             <div class="settings-section">
+                <div class="settings-section-title">🔌 Integrations (Instantly, SignalHire, Webhooks)</div>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label class="form-label">SignalHire API Key</label>
+                        <input type="password" class="form-input" id="setting-signalhire_api_key" placeholder="Enter SignalHire key">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Instantly API Key</label>
+                        <input type="password" class="form-input" id="setting-instantly_api_key" placeholder="Enter Instantly key">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Instantly Default Campaign ID</label>
+                        <input type="text" class="form-input" id="setting-instantly_default_campaign_id" placeholder="Enter Campaign ID">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Zapier / Make Outbound Webhook URL</label>
+                        <input type="url" class="form-input" id="setting-outbound_webhook_url" placeholder="https://hooks.zapier.com/...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Allowed Sign-up Domains (comma separated)</label>
+                        <input type="text" class="form-input" id="setting-allowed_domains" placeholder="cosmosol.com" value="cosmosol.com">
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
                 <div class="settings-section-title">📧 Email Sending (SMTP)</div>
                 <div class="settings-grid">
                     <div class="form-group">
@@ -561,6 +587,39 @@
     </div>
 </div>
 
+
+<!-- AI Assistant Drawer -->
+<div class="ai-drawer-trigger" onclick="toggleAIDrawer()">
+    <span class="trigger-icon">🤖</span>
+    <span class="trigger-text">LeadLift AI</span>
+</div>
+
+<div class="ai-drawer" id="ai-drawer">
+    <div class="ai-drawer-header">
+        <div style="display:flex; align-items:center; gap:var(--space-sm);">
+            <span>🤖</span>
+            <div>
+                <h4 style="margin:0; font-size:0.9rem;">LeadLift AI</h4>
+                <small style="color:var(--text-muted); font-size:0.68rem;">Cosmasol Active Assistant</small>
+            </div>
+        </div>
+        <button class="btn btn-ghost btn-icon btn-sm" onclick="toggleAIDrawer()">✕</button>
+    </div>
+    <div class="ai-drawer-chat" id="ai-chat-messages">
+        <div class="ai-message assistant">
+            Hello! I am your conversational marketing assistant. You can ask me to list contacts, draft emails, check meetings, or perform direct SQL edits in the system!
+        </div>
+    </div>
+    <div class="ai-drawer-suggestions">
+        <span onclick="runAISuggestion('List contacts in lead manager')">🔍 List Leads</span>
+        <span onclick="runAISuggestion('Show active meetings')">📅 Meetings</span>
+        <span onclick="runAISuggestion('Draft a cold email template')">✉️ Draft Sequence</span>
+    </div>
+    <form class="ai-drawer-input-area" onsubmit="submitAICommand(event)">
+        <input type="text" class="form-input" id="ai-prompt-input" placeholder="Ask LeadLift AI..." required>
+        <button class="btn btn-primary btn-sm" type="submit" style="padding: 8px 14px;">Send</button>
+    </form>
+</div>
 
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>

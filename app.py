@@ -5,6 +5,9 @@ Main application entry point with all API endpoints.
 
 import json
 import os
+import hashlib
+import secrets
+import hmac
 from datetime import datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -21,6 +24,53 @@ from automation import (
     get_setting, set_setting, get_all_settings, AGENCY_PITCH_HOOKS
 )
 
+# ── Authentication Helper Functions ──
+SECRET_KEY = os.environ.get("SESSION_SECRET", "cosmasol_leadlift_super_secret_key_12345")
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    pw_hash = hashlib.pbkdf2_hmac(
+        'sha256', 
+        password.encode('utf-8'), 
+        salt.encode('utf-8'), 
+        100000
+    ).hex()
+    return f"{salt}:{pw_hash}"
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        salt, pw_hash = stored_hash.split(':')
+        compare_hash = hashlib.pbkdf2_hmac(
+            'sha256', 
+            password.encode('utf-8'), 
+            salt.encode('utf-8'), 
+            100000
+        ).hex()
+        return secrets.compare_digest(pw_hash, compare_hash)
+    except Exception:
+        return False
+
+def sign_session(email: str) -> str:
+    message = f"{email}:{int(datetime.now().timestamp())}"
+    signature = hmac.new(SECRET_KEY.encode('utf-8'), message.encode('utf-8'), hashlib.sha256).hexdigest()
+    return f"{message}:{signature}"
+
+def verify_session(token: str) -> str | None:
+    try:
+        parts = token.split(':')
+        if len(parts) != 3:
+            return None
+        email, timestamp_str, signature = parts
+        message = f"{email}:{timestamp_str}"
+        expected_sig = hmac.new(SECRET_KEY.encode('utf-8'), message.encode('utf-8'), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected_sig):
+            return None
+        timestamp = int(timestamp_str)
+        if datetime.now().timestamp() - timestamp > 7 * 86400:
+            return None
+        return email
+    except Exception:
+        return None
 
 # ── App Lifecycle ──
 @asynccontextmanager
@@ -31,7 +81,6 @@ async def lifespan(app: FastAPI):
     print(f"   ✅ Database ready: {result}")
     yield
     print("👋 Shutting down LeadLift.")
-
 
 app = FastAPI(
     title="LeadLift Marketing Automation",
@@ -47,22 +96,141 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Auth middleware to guard endpoints
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    public_paths = [
+        "/static/login.html", 
+        "/api/auth/login", 
+        "/api/auth/signup", 
+        "/docs", 
+        "/openapi.json"
+    ]
+    if path in public_paths or path.startswith("/static/css/") or path.startswith("/static/js/") or path.startswith("/static/img/") or path.startswith("/static/assets/"):
+        return await call_next(request)
+    
+    # Exclude basic static files from HTML redirects to prevent breaking stylesheets
+    if "." in path.split("/")[-1] and not path.startswith("/api/"):
+        return await call_next(request)
+        
+    session = request.cookies.get("session")
+    email = None
+    if session:
+        email = verify_session(session)
+    if not email:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            email = verify_session(token)
+            
+    if not email:
+        if path.startswith("/api/"):
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+        return HTMLResponse(content="<script>window.location.href = '/static/login.html';</script>")
+        
+    request.state.user = email
+    return await call_next(request)
+
 # Serve static files (dashboard)
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# ═══════════════════════════════════════════════════════════════
+# AUTHENTICATION ENDPOINTS
+# ═══════════════════════════════════════════════════════════════
+
+@app.post("/api/auth/signup")
+async def signup(request: Request):
+    data = await request.json()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+        
+    # Check domain locking (default allow cosmosol.com)
+    allowed_domains_str = get_setting("allowed_domains", "cosmosol.com")
+    allowed_domains = [d.strip().lower() for d in allowed_domains_str.split(",") if d.strip()]
+    domain = email.split("@")[-1] if "@" in email else ""
+    if domain not in allowed_domains:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Registration restricted. Domain '@{domain}' is not allowed. Supported domains: {', '.join(allowed_domains)}"
+        )
+        
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+    if existing:
+        conn.close()
+        raise HTTPException(status_code=400, detail="User with this email already exists")
+        
+    password_hash = hash_password(password)
+    conn.execute(
+        "INSERT INTO users (email, password_hash) VALUES (?, ?)", 
+        (email, password_hash)
+    )
+    conn.commit()
+    conn.close()
+    
+    log_activity("user_registered", "users", details=f"User {email} registered successfully")
+    return {"message": "User registered successfully"}
+
+@app.post("/api/auth/login")
+async def login(request: Request):
+    data = await request.json()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+        
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    conn.close()
+    
+    if not user or not verify_password(password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+    token = sign_session(email)
+    response = JSONResponse(content={"message": "Logged in successfully", "token": token, "email": email})
+    response.set_cookie(
+        key="session", 
+        value=token, 
+        httponly=True, 
+        max_age=7 * 86400, 
+        samesite="lax"
+    )
+    return response
+
+@app.post("/api/auth/logout")
+async def logout():
+    response = JSONResponse(content={"message": "Logged out successfully"})
+    response.delete_cookie(key="session")
+    return response
+
+@app.get("/api/auth/me")
+async def get_me(request: Request):
+    if not hasattr(request.state, "user"):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"email": request.state.user}
 
 # ═══════════════════════════════════════════════════════════════
 # DASHBOARD HOME
 # ═══════════════════════════════════════════════════════════════
 
 @app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
+async def serve_dashboard(request: Request):
     """Serve the main dashboard HTML."""
+    session = request.cookies.get("session")
+    email = verify_session(session) if session else None
+    if not email:
+        return HTMLResponse(content="<script>window.location.href = '/static/login.html';</script>")
     index_path = static_dir / "index.html"
     if index_path.exists():
         return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>Dashboard not found. Place index.html in /static/</h1>")
     return HTMLResponse(content="<h1>Dashboard not found. Place index.html in /static/</h1>")
 
 
@@ -698,6 +866,150 @@ async def export_csv(table_name: str):
         media_type="text/csv",
         headers=headers
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+# INTEGRATIONS ENDPOINTS
+# ═══════════════════════════════════════════════════════════════
+
+@app.post("/api/contacts/{contact_id}/enrich")
+async def enrich_contact(contact_id: int):
+    """Enrich contact via SignalHire."""
+    from automation import enrich_contact_signalhire
+    res = enrich_contact_signalhire(contact_id)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to enrich"))
+    return res
+
+@app.post("/api/contacts/{contact_id}/push-instantly")
+async def push_lead_instantly(contact_id: int, campaign_id: str = Query(None)):
+    """Add contact to Instantly campaign."""
+    from automation import add_lead_to_instantly
+    res = add_lead_to_instantly(contact_id, campaign_id)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to add to Instantly"))
+    return res
+
+@app.post("/api/contacts/{contact_id}/trigger-webhook")
+async def trigger_webhook(contact_id: int, event: str = Query("manual_trigger")):
+    """Trigger outbound Zapier/Make.com webhook for contact."""
+    from automation import trigger_outbound_webhook
+    conn = get_db()
+    contact = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
+    conn.close()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+        
+    res = trigger_outbound_webhook(event, dict(contact))
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Webhook failed"))
+    return res
+
+
+
+# ═══════════════════════════════════════════════════════════════
+# AI COMMAND ASSISTANT
+# ═══════════════════════════════════════════════════════════════
+
+@app.post("/api/ai/command")
+async def ai_command(request: Request):
+    """Conversational AI controller endpoint to parse and execute database actions."""
+    if not hasattr(request.state, "user"):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    data = await request.json()
+    prompt = data.get("prompt", "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Prompt is required")
+        
+    api_key = get_setting("gemini_api_key")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Gemini API Key is not configured in Settings.")
+        
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        
+        system_instruction = """
+        You are the LeadLift AI Assistant. You help Cosmosol employees automate sales & marketing.
+        You have direct read-write access to an SQLite database.
+        
+        The database tables are:
+        - agencies(id, name, website, city, state, services, notable_clients, contact_page_url, general_email, phone, partnership_score, pipeline_stage, notes, created_at, updated_at)
+        - clinics(id, name, website, location, specialty, has_chatbot, social_media_score, lead_quality_score, pipeline_stage, notes, created_at, updated_at)
+        - contacts(id, name, title, company, company_id, lead_type, email, phone, linkedin_url, instagram_url, facebook_url, x_url, instantly_lead_id, confidence_score, pipeline_stage, notes, created_at, updated_at)
+        - outreach_log(id, contact_id, contact_name, company_name, lead_type, channel, message_subject, message_body, sent_date, status, follow_up_count, last_follow_up_date, opened_at, replied_at, notes, created_at)
+        - meetings(id, contact_id, contact_name, company_name, lead_type, meeting_date, meeting_time, meeting_format, status, pre_meeting_brief, outcome, notes, created_at, updated_at)
+        
+        Your task is to analyze the user's command and decide if it is a database query/action, a system command, or a normal question.
+        If it requires querying or modifying the database, output a single JSON block with:
+        {
+          "type": "sql",
+          "query": "SELECT ... or UPDATE ... or INSERT ...",
+          "params": [...],
+          "explanation": "Brief explanation of what this query does"
+        }
+        
+        If it is a general question (e.g. drafting an outreach pitch, greeting, general advice), output:
+        {
+          "type": "chat",
+          "response": "Your text response or draft here"
+        }
+        
+        Make sure you only output valid JSON matching one of the schemas above. Do not output markdown code blocks, just raw JSON.
+        """
+        
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={
+                "system_instruction": system_instruction,
+                "response_mime_type": "application/json"
+            }
+        )
+        
+        res_json = json.loads(response.text.strip())
+        
+        if res_json.get("type") == "sql":
+            query = res_json.get("query", "")
+            params = res_json.get("params", [])
+            explanation = res_json.get("explanation", "")
+            
+            conn = get_db()
+            cursor = conn.cursor()
+            try:
+                forbidden = ["drop ", "truncate ", "alter table ", "delete from users"]
+                if any(f in query.lower() for f in forbidden):
+                    raise ValueError("Security violation: DDL or sensitive deletions are blocked.")
+                    
+                cursor.execute(query, params)
+                if query.strip().lower().startswith("select"):
+                    rows = cursor.fetchall()
+                    data_res = [dict(row) for row in rows]
+                else:
+                    conn.commit()
+                    data_res = {"rows_affected": cursor.rowcount}
+                    
+                conn.close()
+                log_activity("ai_sql_executed", "ai", details=f"Query: {query}")
+                return {
+                    "type": "sql",
+                    "explanation": explanation,
+                    "query": query,
+                    "data": data_res
+                }
+            except Exception as sql_err:
+                conn.close()
+                return {
+                    "type": "error",
+                    "error": f"Failed to execute AI-generated SQL query: {str(sql_err)}",
+                    "query": query
+                }
+                
+        return res_json
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Controller Error: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════

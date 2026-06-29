@@ -33,6 +33,17 @@ def init_db():
     conn = get_db()
     cursor = conn.cursor()
 
+    # ── Users Table ──
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'employee',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+
     # ── Agencies Table ──
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS agencies (
@@ -84,6 +95,10 @@ def init_db():
             email TEXT,
             phone TEXT,
             linkedin_url TEXT,
+            instagram_url TEXT,
+            facebook_url TEXT,
+            x_url TEXT,
+            instantly_lead_id TEXT,
             confidence_score INTEGER DEFAULT 0,
             pipeline_stage TEXT DEFAULT 'enriched',
             notes TEXT,
@@ -92,6 +107,13 @@ def init_db():
             FOREIGN KEY (company_id) REFERENCES agencies(id)
         )
     """)
+
+    # Alter table if columns do not exist
+    cursor.execute("PRAGMA table_info(contacts)")
+    existing_cols = [row[1] for row in cursor.fetchall()]
+    for col in ["instagram_url", "facebook_url", "x_url", "instantly_lead_id"]:
+        if col not in existing_cols:
+            cursor.execute(f"ALTER TABLE contacts ADD COLUMN {col} TEXT")
 
     # ── Outreach Log Table ──
     cursor.execute("""
