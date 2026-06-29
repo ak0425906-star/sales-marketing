@@ -532,6 +532,8 @@ function renderContactsTable() {
                 <td><span class="score-badge ${scoreClass}">${c.confidence_score}</span></td>
                 <td>
                     <div style="display:flex; gap:4px;">
+                        <button class="btn btn-sm btn-ghost" onclick="enrichContact(${c.id})" title="Enrich via SignalHire">🔍</button>
+                        <button class="btn btn-sm btn-ghost" onclick="pushToInstantly(${c.id})" title="Push to Instantly">🚀</button>
                         <button class="btn btn-sm btn-ghost" onclick="composeForContact(${c.id})" title="Compose">✉️</button>
                         <button class="btn btn-sm btn-danger" onclick="deleteContact(${c.id})" title="Delete">🗑️</button>
                     </div>
@@ -1296,6 +1298,38 @@ function appendAIMessage(content, type) {
 function removeLoadingMessage(id) {
     const el = document.getElementById(id);
     if (el) el.remove();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INTEGRATIONS & SYSTEM
+// ═══════════════════════════════════════════════════════════════
+
+async function enrichContact(id) {
+    showToast('Enriching contact...', 'info');
+    try {
+        await api(`/api/contacts/${id}/enrich`, 'POST');
+        showToast('Enrichment successful!', 'success');
+        loadContacts();
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+async function pushToInstantly(id) {
+    showToast('Pushing to Instantly...', 'info');
+    try {
+        await api(`/api/contacts/${id}/push-instantly`, 'POST');
+        showToast('Pushed to Instantly!', 'success');
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+async function logout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {}
+    window.location.href = '/static/login.html';
 }
 
 

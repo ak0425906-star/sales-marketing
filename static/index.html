@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LeadLift — Marketing Automation Dashboard</title>
     <meta name="description" content="LeadLift Marketing Automation System — AI-powered lead capture and outreach for Cosmasol.">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=2">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
@@ -16,7 +16,7 @@
          SIDEBAR
          ═══════════════════════════════════════════ -->
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-logo">
+        <div class="sidebar-logo" onclick="navigateTo('dashboard')" style="cursor: pointer;">
             <img src="/static/logo.png" alt="LeadLift" class="logo-icon" style="width:42px; height:42px; border-radius:var(--radius-md); object-fit:contain;">
             <div>
                 <h1>LeadLift</h1>
@@ -66,6 +66,10 @@
             <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Settings</span>
+            </div>
+            <div class="nav-item" onclick="logout()" style="margin-top: auto; color: var(--accent-danger);">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-label">Log out</span>
             </div>
         </nav>
 
