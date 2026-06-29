@@ -663,6 +663,28 @@ def enrich_contact_signalhire(contact_id: int) -> dict:
     email = contact["email"]
     linkedin = contact["linkedin_url"]
     
+    # ── MOCK MODE FOR TEST KEYS ──
+    if api_key.startswith("sh_test"):
+        import time
+        time.sleep(1) # Simulate network delay
+        update_fields = {}
+        if not contact["facebook_url"]:
+            update_fields["facebook_url"] = f"https://facebook.com/{contact['name'].replace(' ', '').lower()}"
+        if not contact["x_url"]:
+            update_fields["x_url"] = f"https://x.com/{contact['name'].replace(' ', '').lower()}"
+        
+        if update_fields:
+            set_parts = ", ".join([f"{k} = ?" for k in update_fields.keys()])
+            vals = list(update_fields.values()) + [contact_id]
+            db = get_db()
+            db.execute(f"UPDATE contacts SET {set_parts} WHERE id = ?", vals)
+            db.commit()
+            db.close()
+        
+        log_activity("contact_enriched", "contacts", contact_id, f"SignalHire (MOCK) enriched fields: {list(update_fields.keys())}")
+        return {"success": True, "enriched": update_fields, "mock": True}
+    # ─────────────────────────────
+    
     payload = {}
     if email:
         payload["email"] = email
@@ -730,6 +752,18 @@ def add_lead_to_instantly(contact_id: int, campaign_id: str = None) -> dict:
     
     if not contact or not contact["email"]:
         return {"success": False, "error": "Contact email missing"}
+
+    # ── MOCK MODE FOR TEST KEYS ──
+    if api_key.startswith("in_test"):
+        import time
+        time.sleep(1) # Simulate network delay
+        db = get_db()
+        db.execute("UPDATE contacts SET instantly_lead_id = ? WHERE id = ?", (f"mock_lead_{contact_id}", contact_id))
+        db.commit()
+        db.close()
+        log_activity("contact_pushed", "contacts", contact_id, f"Instantly (MOCK) added to campaign {campaign_id}")
+        return {"success": True, "instantly_lead_id": f"mock_lead_{contact_id}", "mock": True}
+    # ─────────────────────────────
         
     names = contact["name"].split(" ", 1)
     first_name = names[0]
